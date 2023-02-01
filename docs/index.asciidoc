@@ -235,6 +235,47 @@ use label parsing for severity and facility levels
 use priority field if set to false
 
 
+[id="plugins-{type}s-{plugin}-use_rebinding"]
+===== `use_rebinding` 
+
+  * Value type is <<number,number>>
+  * Default value is `0`
+
+use rebinding to re-establish the connection (Load Balancer friendly)
+the options are:
+ 0 -> No usage at all
+ 1 -> Use with time based rebinding, disconnect after X miliseconds
+ 2 -> Use with number of messages, disconnect after X number of events sent
+ 3 -> Use with time and quantity. The first one that reaches resets the other
+rebind_num_messages and rebind_interval would be used and can be set to 
+suitable values
+
+[id="plugins-{type}s-{plugin}-rebind_num_messages"]
+===== `rebind_num_messages` 
+
+  * Value type is <<number,number>>
+  * Default value is `50000`
+
+rebind_num_messages optional variable that defines after how many messages
+syslog component should redo a restart, with a default value of 50000 messages
+
+Depends on having use_rebinding with value 2 or 3 
+
+
+[id="plugins-{type}s-{plugin}-rebind_interval"]
+===== `rebind_interval` 
+
+  * Value type is <<number,number>>
+  * Default value is `60000`
+
+rebind_interval optional variable that defines after how miliseconds
+syslog component should redo a restart, with a default value of 60 seconds 
+note that it will only restablish a new connection once events are 
+received. If you get 1 event every 70  seconds it should create a new connection 
+per event on default settings.
+  
+Depends on having use_rebinding with value 2 or 3 
+
 
 [id="plugins-{type}s-{plugin}-common-options"]
 include::{include_path}/{type}.asciidoc[]

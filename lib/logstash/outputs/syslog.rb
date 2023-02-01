@@ -3,6 +3,7 @@ require "logstash/outputs/base"
 require "logstash/namespace"
 require "date"
 require "logstash/codecs/plain"
+require "time"
 
 
 # Send events to a syslog server.
@@ -125,9 +126,38 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
   # syslog message format: you can choose between rfc3164 or rfc5424
   config :rfc, :validate => ["rfc3164", "rfc5424"], :default => "rfc3164"
 
+  # Use rebinding. If enabled timers per host ,protocol 
+  # and port will apply. Enabling this can have impact in the number 
+  # of sockets open since it will re-establish the connection. This is
+  # Loadbalancer friendly. 
+  # 0 means no usage, 1 means timebased only, 2 means number of messages only
+  # 3 means timebased and number of messages enabled first to reach resets the 
+  # other counter
+  config :use_rebinding, :validate => :number, :default => 0
+
+  # rebind_num_messages optional variable that defines after how many messages
+  # syslog connection should redo a restart, with a default value of 50000 messages
+  config :rebind_num_messages, :validate => :number, :default => 50000
+  
+  # rebind_interval optional variable that defines after how many miliseconds
+  # syslog connection should redo a restart, with a default value of 60 seconds 
+  # note that it will only restablish a new connection once events are 
+  # received. If you get 1 event every 70  seconds it should create a new connection 
+  # per event on default settings.
+  config :rebind_interval, :validate => :number, :default => 60000
+  
+
   def register
     @client_socket = nil
 
+    if rebinding_counterbased?
+      # counter is the hash table that will keep the counters
+      @counter_messages = {}
+    end
+    if rebinding_timebased?
+      # counter is the hash table that will keep the counters
+      @counter_times = {}
+    end
     if ssl?
       @ssl_context = setup_ssl
     end
@@ -173,7 +203,42 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
       syslog_msg = "<#{priority.to_s}>1 #{timestamp} #{sourcehost} #{appname} #{procid} #{msgid} - #{message}"
     end
 
-    begin
+    begin      
+      if rebinding_timebased?        
+        # Define or get a counter for time per host, protocol and port
+        current_counter_times = @counter_times["#{host}:#{protocol}:#{port}"] ||  (Time.now.to_f * 1000).to_i
+        
+        # check if the counter is above the threshold, to calculate it you get the difference
+        #between it and the previous execution and get the value
+        if (Time.now.to_f * 1000).to_i - current_counter_times > @rebind_interval
+          # if it is, disconnect from the backend. 
+          @client_socket.disconnect if @client_socket
+          @counter_times["#{host}:#{protocol}:#{port}"] = (Time.now.to_f * 1000).to_i
+          if rebinding_counterbased?
+            # Reset the counter since we need to start again, is first to serve
+            @counter_messages["#{host}:#{protocol}:#{port}"]=0
+          end
+        end
+      end
+      if rebinding_counterbased?
+        # Define or get a counter per host, protocol and port
+        current_counter = @counter_messages["#{host}:#{protocol}:#{port}"] || 0
+        # increment the counter
+        @counter_messages["#{host}:#{protocol}:#{port}"] = current_counter + 1
+
+        # check if the counter is above the threshold
+        if @counter_messages["#{host}:#{protocol}:#{port}"] > @rebind_num_messages
+          # if it is, disconnect from the backend
+          @client_socket.disconnect if @client_socket
+          # Reset the counter since we need to start again
+          @counter_messages["#{host}:#{protocol}:#{port}"]=0
+          if rebinding_timebased?
+            # forcing the time counter to be restarted because we dont want to restart
+            # all the time
+            @counter_times["#{host}:#{protocol}:#{port}"] = (Time.now.to_f * 1000).to_i
+          end
+        end
+      end
       @client_socket ||= connect
       @client_socket.write(syslog_msg + "\n")
     rescue => e
@@ -192,6 +257,12 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
 
   private
 
+  def rebinding_timebased?
+    @use_rebinding & 1 == 1
+  end
+  def rebinding_counterbased?
+    @use_rebinding & 2 == 1
+  end
   def udp?
     @protocol == "udp"
   end
