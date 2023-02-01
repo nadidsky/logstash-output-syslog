@@ -93,6 +93,22 @@ describe LogStash::Outputs::Syslog do
     it_behaves_like "syslog output"
   end
 
+  context "use_octet_counting == false, default" do
+    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000", "msgid" => "2000" }) }
+    let(:options) { {"use_octet_counting" => false, "rfc" => "rfc5424", "host" => "foo", "port" => "123", "facility" => "%{facility}", "severity" => "%{severity}", "appname" => "%{appname}", "procid" => "%{procid}", "msgid" => "%{msgid}"} }
+    let(:output) { /^<18>1 #{RFC3339_DATE_TIME_REGEX} baz appname 1000 2000 - bar\n/m }
+
+    it_behaves_like "syslog output"
+  end
+
+  context "use_octet_counting == true" do
+    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000", "msgid" => "2000" }) }
+    let(:options) { {"use_octet_counting" => true, "rfc" => "rfc5424", "host" => "foo", "port" => "123", "facility" => "%{facility}", "severity" => "%{severity}", "appname" => "%{appname}", "procid" => "%{procid}", "msgid" => "%{msgid}"} }
+    let(:output) { /^\d+ <18>1 #{RFC3339_DATE_TIME_REGEX} baz appname 1000 2000 - bar\n/m }
+
+    it_behaves_like "syslog output"
+  end
+
   context "use plain codec with format set" do
     let(:plain) { LogStash::Codecs::Plain.new({"format" => "%{host} %{message}"}) }
     let(:options) { {"host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency", "codec" => plain} }

@@ -124,6 +124,9 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
 
   # syslog message format: you can choose between rfc3164 or rfc5424
   config :rfc, :validate => ["rfc3164", "rfc5424"], :default => "rfc3164"
+  
+  # use octet as defined by rfc6587 octet counting section
+  config :use_octet_counting, :validate => :boolean, :default => false
 
   def register
     @client_socket = nil
@@ -171,6 +174,9 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
       msgid = event.sprintf(@msgid)
       timestamp = event.sprintf("%{+YYYY-MM-dd'T'HH:mm:ss.SSSZZ}")
       syslog_msg = "<#{priority.to_s}>1 #{timestamp} #{sourcehost} #{appname} #{procid} #{msgid} - #{message}"
+      if @use_octet_counting
+        syslog_msg = "#{syslog_msg.bytesize} #{syslog_msg}"
+      end
     end
 
     begin

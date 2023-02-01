@@ -1,3 +1,8 @@
+## 3.0.6:
+  - Docs: Added octet counting capabilities to the module (RFC6587 https://www.rfc-editor.org/rfc/rfc6587.html)
+  - Added code to consider octet-counting 
+  - Added tests to consider octet-counting
+
 ## 3.0.5
   - Docs: Set the default_codec doc attribute.
 

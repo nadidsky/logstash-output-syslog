@@ -59,6 +59,7 @@ This plugin supports the following configuration options plus the <<plugins-{typ
 | <<plugins-{type}s-{plugin}-ssl_key_passphrase>> |<<password,password>>|No
 | <<plugins-{type}s-{plugin}-ssl_verify>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-use_labels>> |<<boolean,boolean>>|No
+| <<plugins-{type}s-{plugin}-use_octet_counting>> |<<boolean,boolean>>|No
 |=======================================================================
 
 Also see <<plugins-{type}s-{plugin}-common-options>> for a list of options supported by all
@@ -233,6 +234,15 @@ Verify the identity of the other end of the SSL connection against the CA.
 
 use label parsing for severity and facility levels
 use priority field if set to false
+
+===== `use_octet_counting` 
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `false`
+
+use octet counting allows rfc5424 to follow rfc6587 and
+send events without limited length, useful for long event messages with line feeds 
+and null characters. The receiving end would wait until receiving all the message size
 
 
 
