@@ -254,7 +254,9 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
       retry
     end
   end
-
+  def whatsTheSocket
+   @client_socket 
+  end
   private
 
   def rebinding_timebased?

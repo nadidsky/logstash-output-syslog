@@ -22,6 +22,7 @@ describe LogStash::Outputs::Syslog do
   end
 
   let(:socket) { double("fake socket") }
+  let(:socket2) { double("fake socket") }
   let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz"}) }
   let(:sleep_time) {60000}
   let(:events_max_count) { 50000 }
@@ -40,12 +41,14 @@ describe LogStash::Outputs::Syslog do
   shared_examples "syslog output and socket changes by events" do
     it "should write expected format" do
       expect(subject).to receive(:connect).and_return(socket)
+      socket=subject.whatsTheSocket
       expect(socket).to receive(:write).with(output)
       subject.receive(event)
     end
-    it "should wait for X seconds to exceed the timebased threshold" do
-      (event_count-1).times do |count|
+    it "should wait for X events to exceed the event threshold" do
+      (events_max_count-1).times do |count|
         expect(subject).to receive(:connect).and_return(socket2)
+        socket2=subject.whatsTheSocket
         expect(socket2).to receive(:write).with(output)
         expect(socket2).to be(socket)
         subject.receive(event)      
@@ -64,6 +67,7 @@ describe LogStash::Outputs::Syslog do
     it "should write expected format" do
       expect(subject).to receive(:connect).and_return(socket)
       expect(socket).to receive(:write).with(output)
+      socket=subject.whatsTheSocket
       subject.receive(event)
     end
     it "should wait for X seconds to exceed the timebased threshold" do
@@ -71,6 +75,7 @@ describe LogStash::Outputs::Syslog do
     end
     it "should check whether the socket has changed if we send again an event" do
       expect(subject).to receive(:connect).and_return(socket2)
+      socket2=subject.whatsTheSocket
       expect(socket2).to receive(:write).with(output)
       expect(socket2).not_to be(socket)
       subject.receive(event)      
@@ -78,58 +83,69 @@ describe LogStash::Outputs::Syslog do
   end
 
   context "use rebinding 0 by default" do 
-    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+    #let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
     let(:options) { {"host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
-    let(:output) { /^<18>#{RFC3164_DATE_TIME_REGEX} baz appname\[1000\]: bar\n/m }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
 
     it_behaves_like "syslog output"
   end
 
-  context "use rebinding 0 defined by user" do 
-    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+  context "use rebinding value as 0 defined by the user" do 
+#    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
     let(:options) { {"use_rebinding" => "0","host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
-    let(:output) { /^<18>#{RFC3164_DATE_TIME_REGEX} baz appname\[1000\]: bar\n/m }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
     
-    it_behaves_like "syslog output and socket changes"
+    it_behaves_like "syslog output"
   end
 
   
-  context "use rebinding 1 defined and no timebased variable" do 
+  context "use rebinding value as 1 and do not pass any other rebind variable" do 
     let(:sleep_time) { 60000 }
-    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+#    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
     let(:options) { {"use_rebinding" => "1","host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
-    let(:output) { /^<18>#{RFC3164_DATE_TIME_REGEX} baz appname\[1000\]: bar\n/m }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
     
-    it_behaves_like "syslog output and socket changes"
+    it_behaves_like "syslog output and socket changes by time"
   end  
-  context "use rebinding 1 defined and timebased variable defined to 1 sec" do 
+  context "use rebinding value as 1 and define rebind_interval to one second" do 
     let(:sleep_time) { 1000 }
-    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+#    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
     let(:options) { {"use_rebinding" => "1","rebind_interval" => sleep_time,"host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
-    let(:output) { /^<18>#{RFC3164_DATE_TIME_REGEX} baz appname\[1000\]: bar\n/m }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
     
-    it_behaves_like "syslog output and socket changes"
+    it_behaves_like "syslog output and socket changes by time"
   end  
-  context "use rebinding 2 defined and no rebind_num_messages variable" do 
+  context "use rebinding value as 2 and not define any of the rebind variables" do 
     let(:sleep_time) { 60000 }
-    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+#    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
     let(:options) { {"use_rebinding" => "1","host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
-    let(:output) { /^<18>#{RFC3164_DATE_TIME_REGEX} baz appname\[1000\]: bar\n/m }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
     
-    it_behaves_like "syslog output and socket changes"
+    it_behaves_like "syslog output and socket changes by events"
   end  
   context "use rebinding 2 defined and timebased variable defined to 1 sec" do 
     let(:sleep_time) { 1000 }
     # Should continue with the same connection until it has received 50000 events, ignoring the time
     # in our test should just not change 
 
-    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+#    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
     let(:options) { {"use_rebinding" => "2","rebind_interval" => sleep_time,"host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
-    let(:output) { /^<18>#{RFC3164_DATE_TIME_REGEX} baz appname\[1000\]: bar\n/m }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
     
-    it_behaves_like "syslog output and socket changes"
+    it_behaves_like "syslog output and socket changes by events"
   end  
   
+  context "use rebinding 2 defined and rebind_mebased variable defined to 1 sec" do 
+    let(:events_max_count) { 1000 }
+    # Should continue with the same connection until it has received 50000 events, ignoring the time
+    # in our test should just not change 
+
+#    let(:event) { LogStash::Event.new({"message" => "bar", "host" => "baz", "facility" => "mail", "severity" => "critical", "appname" => "appname", "procid" => "1000" }) }
+    let(:options) { {"use_rebinding" => "2","rebind_num_messages" => events_max_count,"host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
+    let(:output) { /^<0>#{RFC3164_DATE_TIME_REGEX} baz LOGSTASH\[-\]: bar\n/m }
+    
+    it_behaves_like "syslog output and socket changes by events"
+  end  
   
   context "rfc 3164 and udp by default" do
     let(:options) { {"host" => "foo", "port" => "123", "facility" => "kernel", "severity" => "emergency"} }
